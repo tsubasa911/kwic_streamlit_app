@@ -1,8 +1,22 @@
 import streamlit as st
 import spacy
+import importlib.util
+import subprocess
+import sys
 
-# Load pre-installed spaCy model
-nlp = spacy.load("en_core_web_sm")
+# Ensure model is installed
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+            check=True,
+        )
+        nlp = spacy.load("en_core_web_sm")
+    except Exception:
+        st.error("Failed to load or download the spaCy model.")
+        st.stop()
 
 # App title
 st.title("KWIC: Keyword in Context")
