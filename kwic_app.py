@@ -1,18 +1,29 @@
 import streamlit as st
 import spacy
 
-# Load spaCy model (must be installed via requirements.txt)
+# Load spaCy model
 try:
     nlp = spacy.load("en_core_web_sm")
 except Exception as e:
     st.error("❌ Failed to load the spaCy model 'en_core_web_sm'. Please check your requirements.txt.")
     st.stop()
 
-# App title
+# Title
 st.title("KWIC: Keyword in Context")
 
-# Text input
-raw_text = st.text_area("Enter your text here", height=200)
+# Upload file
+uploaded_file = st.file_uploader("Upload a .txt file", type=["txt"])
+
+# Fallback raw text input
+st.markdown("Or paste your text below:")
+raw_text = st.text_area("Text input", height=200)
+
+# Combine uploaded content if available
+if uploaded_file is not None:
+    file_content = uploaded_file.read().decode("utf-8")
+    combined_text = file_content
+else:
+    combined_text = raw_text
 
 # Keyword input
 keyword = st.text_input("Enter a keyword to search (e.g., artificial intelligence)")
@@ -22,10 +33,10 @@ window_size = st.slider("Number of words to show before and after keyword", min_
 
 # Run search
 if st.button("Search"):
-    if not raw_text.strip() or not keyword.strip():
-        st.warning("Please enter both the text and the keyword.")
+    if not combined_text.strip() or not keyword.strip():
+        st.warning("Please provide both the text (file or input) and a keyword.")
     else:
-        doc = nlp(raw_text)
+        doc = nlp(combined_text)
         tokens = [token.text for token in doc]
         keyword_tokens = keyword.strip().split()
         keyword_len = len(keyword_tokens)
