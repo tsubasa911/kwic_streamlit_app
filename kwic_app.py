@@ -9,7 +9,7 @@ def load_model():
 
 nlp = load_model()
 
-# Inject custom CSS for color badges and navigation bar
+# Inject custom CSS for badges and layout
 st.markdown("""
 <style>
 .badge-pos {
@@ -28,14 +28,67 @@ st.markdown("""
   margin-left: 4px;
   font-size: 0.75em;
 }
+.kwic-container {
+  display: flex;
+  font-family: monospace;
+  white-space: pre;
+  margin-bottom: 6px;
+}
+.kwic-index {
+  width: 40px;
+  color: gray;
+  text-align: right;
+  margin-right: 10px;
+}
+.kwic-left {
+  width: 35%;
+  text-align: right;
+  padding-right: 10px;
+  color: #333;
+}
+.kwic-keyword {
+  background-color: #2a9df4;
+  color: #ffffff;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.kwic-follow {
+  background-color: #fff176;
+  color: #000000;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+.kwic-right {
+  width: 35%;
+  text-align: left;
+  padding-left: 10px;
+  color: #333;
+}
+.kwic-meta {
+  font-size: 0.75em;
+  color: #444;
+  margin-left: 50px;
+  margin-bottom: 16px;
+}
+.group-title {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 4px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Navigation help bar
+# Help Section
 with st.expander("📘 使い方ガイドはこちら（初めての方へ）"):
     st.markdown("""
     **KWIC Viewerの使い方：**
-
     1. 分析対象のテキストを貼り付ける、または.txtファイルをアップロード
     2. キーワードを入力（例：artificial intelligence）
     3. 表示モード（順序・頻度・フィルタ）を選択し、「Search」ボタンを押す
@@ -77,7 +130,6 @@ if st.button("Search"):
         kw_len = len(keyword_tokens)
 
         results = []
-        follow_infos = []
 
         for i in range(len(tokens) - kw_len):
             if tokens[i:i + kw_len] == keyword_tokens:
@@ -91,8 +143,6 @@ if st.button("Search"):
                     ent = follow_token.ent_type_ if follow_token.ent_type_ else "O"
                 except IndexError:
                     token_text, pos, ent = "", "", ""
-
-                follow_infos.append((token_text, pos, ent))
 
                 result = {
                     "left": " ".join(left),
@@ -129,24 +179,29 @@ if st.button("Search"):
 
         st.markdown(f"### 🔍 Showing up to {len(results)} match(es)")
 
-        def render(r):
-            kw_html = f"<span style='color:#ffffff;background:#2a9df4;padding:2px 4px;border-radius:4px;'>{r['keyword']}</span>"
-            follow_html = f"<span style='background:#fff176;color:#000000;padding:2px 6px;border-radius:6px;font-weight:bold;'>{r['follow']}</span>"
-            pos_html = f"<span class='badge-pos'>{r['pos']}</span>"
-            ent_html = f"<span class='badge-entity'>{r['ent']}</span>"
-            return f"<div style='margin-bottom:10px;'>... {r['left']} {kw_html} {follow_html} {r['right']}<br>{pos_html} {ent_html}</div>"
+        def render_kwic(r, index):
+            return f"""
+            <div class='kwic-container'>
+                <div class='kwic-index'>{index+1:>3}</div>
+                <div class='kwic-left'>{r['left']}</div>
+                <div class='kwic-keyword'>{r['keyword']}</div>
+                <div class='kwic-follow'>{r['follow']}</div>
+                <div class='kwic-right'>{r['right']}</div>
+            </div>
+            <div class='kwic-meta'>POS: <span class='badge-pos'>{r['pos']}</span> ENTITY: <span class='badge-entity'>{r['ent']}</span></div>
+            """
 
         if mode.startswith("Filter") or mode == "Sequential":
-            for r in results:
-                st.markdown(render(r), unsafe_allow_html=True)
+            for idx, r in enumerate(results):
+                st.markdown(render_kwic(r, idx), unsafe_allow_html=True)
         else:
             for key in sorted_keys:
-                st.markdown(f"#### 🔹 Group: {key}")
-                for r in results:
+                st.markdown(f"<div class='group-title'>🔹 Group: {key}</div>", unsafe_allow_html=True)
+                for idx, r in enumerate(results):
                     match = (
                         (mode == "Token Frequency" and r["follow"] == key) or
                         (mode == "POS Frequency" and r["pos"] == key) or
                         (mode == "ENTITY Frequency" and r["ent"] == key)
                     )
                     if match:
-                        st.markdown(render(r), unsafe_allow_html=True)
+                        st.markdown(render_kwic(r, idx), unsafe_allow_html=True)
