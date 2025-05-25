@@ -16,23 +16,22 @@ st.markdown("""
   background-color: #d0d0d0;
   color: black;
   border-radius: 6px;
-  padding: 1px 4px;
-  margin-left: 4px;
-  font-size: 0.75em;
+  padding: 2px 6px;
+  margin-right: 6px;
+  font-size: 0.8em;
 }
 .badge-entity {
   background-color: #eeeeee;
   color: black;
   border-radius: 6px;
-  padding: 1px 4px;
-  margin-left: 4px;
-  font-size: 0.75em;
+  padding: 2px 6px;
+  font-size: 0.8em;
 }
 .kwic-line {
   font-family: monospace;
   display: flex;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
   align-items: center;
 }
 .kwic-index {
@@ -69,6 +68,12 @@ st.markdown("""
   overflow-x: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.kwic-meta {
+  margin-left: 45px;
+  margin-bottom: 18px;
+  font-size: 0.85em;
+  color: #333;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -176,9 +181,9 @@ if st.button("Search"):
                 <div class='kwic-follow'>{r['follow']}</div>
                 <div class='kwic-right'>{r['right']}</div>
             </div>
-            <div style='margin-left: 45px;'>
-                <span class='badge-pos'>{r['pos']}</span>
-                <span class='badge-entity'>{r['ent']}</span>
+            <div class='kwic-meta'>
+                <span class='badge-pos'>POS: {r['pos']}</span>
+                <span class='badge-entity'>ENTITY: {r['ent']}</span>
             </div>
             """
 
