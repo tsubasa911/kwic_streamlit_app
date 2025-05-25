@@ -9,7 +9,7 @@ def load_model():
 
 nlp = load_model()
 
-# Inject custom CSS for badges only (revert layout changes)
+# Inject custom CSS for badges and KWIC alignment
 st.markdown("""
 <style>
 .badge-pos {
@@ -27,6 +27,48 @@ st.markdown("""
   padding: 1px 4px;
   margin-left: 4px;
   font-size: 0.75em;
+}
+.kwic-line {
+  font-family: monospace;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.kwic-index {
+  width: 30px;
+  text-align: right;
+  color: gray;
+}
+.kwic-left {
+  text-align: right;
+  width: 40%;
+  overflow-x: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.kwic-keyword {
+  background-color: #2a9df4;
+  color: #ffffff;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.kwic-follow {
+  background-color: #fff176;
+  color: #000000;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.kwic-right {
+  text-align: left;
+  width: 40%;
+  overflow-x: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -125,24 +167,32 @@ if st.button("Search"):
 
         st.markdown(f"### 🔍 Showing up to {len(results)} match(es)")
 
-        def render(r):
-            kw_html = f"<span style='color:#ffffff;background:#2a9df4;padding:2px 4px;border-radius:4px;'>{r['keyword']}</span>"
-            follow_html = f"<span style='background:#fff176;color:#000000;padding:2px 6px;border-radius:6px;font-weight:bold;'>{r['follow']}</span>"
-            pos_html = f"<span class='badge-pos'>{r['pos']}</span>"
-            ent_html = f"<span class='badge-entity'>{r['ent']}</span>"
-            return f"<div style='margin-bottom:10px;'>... {r['left']} {kw_html} {follow_html} {r['right']}<br>{pos_html} {ent_html}</div>"
+        def render_aligned(index, r):
+            return f"""
+            <div class='kwic-line'>
+                <div class='kwic-index'>{index+1:>3}</div>
+                <div class='kwic-left'>{r['left']}</div>
+                <div class='kwic-keyword'>{r['keyword']}</div>
+                <div class='kwic-follow'>{r['follow']}</div>
+                <div class='kwic-right'>{r['right']}</div>
+            </div>
+            <div style='margin-left: 45px;'>
+                <span class='badge-pos'>{r['pos']}</span>
+                <span class='badge-entity'>{r['ent']}</span>
+            </div>
+            """
 
         if mode.startswith("Filter") or mode == "Sequential":
-            for r in results:
-                st.markdown(render(r), unsafe_allow_html=True)
+            for i, r in enumerate(results):
+                st.markdown(render_aligned(i, r), unsafe_allow_html=True)
         else:
             for key in sorted_keys:
                 st.markdown(f"#### 🔹 Group: {key}")
-                for r in results:
+                for i, r in enumerate(results):
                     match = (
                         (mode == "Token Frequency" and r["follow"] == key) or
                         (mode == "POS Frequency" and r["pos"] == key) or
                         (mode == "ENTITY Frequency" and r["ent"] == key)
                     )
                     if match:
-                        st.markdown(render(r), unsafe_allow_html=True)
+                        st.markdown(render_aligned(i, r), unsafe_allow_html=True)
