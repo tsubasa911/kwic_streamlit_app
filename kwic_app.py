@@ -1,7 +1,10 @@
-import streamlit as st
 import spacy
-from collections import defaultdict, Counter
-import re
+import subprocess
+import importlib.util
+
+# モデルがなければ自動でダウンロード
+if importlib.util.find_spec("en_core_web_sm") is None:
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
 
 # モデルの読み込み
 nlp = spacy.load("en_core_web_sm")
