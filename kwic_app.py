@@ -1,12 +1,15 @@
 import spacy
 import subprocess
+import sys
 import importlib.util
 
-# モデルがなければ自動でダウンロード
-if importlib.util.find_spec("en_core_web_sm") is None:
-    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+# en_core_web_sm モデルが無ければ自動ダウンロード
+try:
+    spacy.load("en_core_web_sm")
+except OSError:
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
 
-# モデルの読み込み
+# モデル読み込み（ここは確実に存在している前提でOK）
 nlp = spacy.load("en_core_web_sm")
 
 # 行番号を除去する関数
