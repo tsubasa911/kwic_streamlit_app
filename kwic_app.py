@@ -61,9 +61,10 @@ if st.button("Search"):
                 f"{' '.join(left)} "
                 f"{kw_html} "
                 f"{follow_html} "
-                f{' '.join(right)}"
+                f"{' '.join(right)}"
                 f"<br>{tag_info}</div>"
-                )
+            )
+
             results.append(result_html)
 
     # --- Display ---
