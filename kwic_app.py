@@ -9,7 +9,29 @@ def load_model():
 
 nlp = load_model()
 
-st.title("KWIC Viewer (Fast Version)")
+# Inject custom CSS for color badges
+st.markdown("""
+<style>
+.badge-pos {
+  background-color: #3498db;
+  color: white;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: 4px;
+  font-size: 0.8em;
+}
+.badge-entity {
+  background-color: #e67e22;
+  color: white;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: 4px;
+  font-size: 0.8em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("KWIC Viewer with POS/ENTITY Highlight")
 
 uploaded_file = st.file_uploader("📄 Upload .txt file", type=["txt"])
 raw_text = st.text_area("✍️ Or paste your text here", height=200)
@@ -98,10 +120,10 @@ if st.button("Search"):
 
         def render(r):
             kw_html = f"<span style='color:#ffffff;background:#2a9df4;padding:2px 4px;border-radius:4px;'>{r['keyword']}</span>"
-            follow_html = f"<span style='color:#000000;background:#ffe135;padding:2px 4px;border-radius:4px;font-weight:bold;'>{r['follow']}</span>"
-            pos_html = f"<span style='background:#e0e0e0;color:#333;padding:1px 4px;border-radius:4px;'>POS: {r['pos']}</span>"
-            ent_html = f"<span style='background:#d0ffe0;color:#333;padding:1px 4px;border-radius:4px;'>ENTITY: {r['ent']}</span>"
-            return f"... {r['left']} {kw_html} {follow_html} {r['right']}<br>{pos_html} | {ent_html}"
+            follow_html = f"<strong>{r['follow']}</strong>"
+            pos_html = f"<span class='badge-pos'>{r['pos']}</span>"
+            ent_html = f"<span class='badge-entity'>{r['ent']}</span>"
+            return f"... {r['left']} {kw_html} {follow_html} {pos_html} {ent_html} {r['right']}"
 
         if mode.startswith("Filter") or mode == "Sequential":
             for r in results:
