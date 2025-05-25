@@ -9,27 +9,47 @@ def load_model():
 
 nlp = load_model()
 
-# Inject custom CSS for color badges
+# Inject custom CSS for color badges and navigation bar
 st.markdown("""
 <style>
 .badge-pos {
-  background-color: #3498db;
-  color: white;
+  background-color: #d0d0d0;
+  color: black;
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 1px 4px;
   margin-left: 4px;
-  font-size: 0.8em;
+  font-size: 0.75em;
 }
 .badge-entity {
-  background-color: #e67e22;
-  color: white;
+  background-color: #eeeeee;
+  color: black;
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 1px 4px;
   margin-left: 4px;
-  font-size: 0.8em;
+  font-size: 0.75em;
+}
+.fixed-header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: #f8f8f8;
+  z-index: 1000;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Navigation help bar
+with st.expander("📘 使い方ガイドはこちら（初めての方へ）"):
+    st.markdown("""
+    **KWIC Viewerの使い方：**
+
+    1. 分析対象のテキストを貼り付ける、または.txtファイルをアップロード
+    2. キーワードを入力（例：artificial intelligence）
+    3. 表示モード（順序・頻度・フィルタ）を選択し、「Search」ボタンを押す
+    4. 結果の中から直後の単語とその品詞・固有表現を確認できます
+    """)
 
 st.title("KWIC Viewer with POS/ENTITY Highlight")
 
@@ -120,22 +140,24 @@ if st.button("Search"):
 
         def render(r):
             kw_html = f"<span style='color:#ffffff;background:#2a9df4;padding:2px 4px;border-radius:4px;'>{r['keyword']}</span>"
-            follow_html = f"<strong>{r['follow']}</strong>"
+            follow_html = f"<span style='background:#fff59d;padding:2px 6px;border-radius:6px;font-weight:bold;'>{r['follow']}</span>"
             pos_html = f"<span class='badge-pos'>{r['pos']}</span>"
             ent_html = f"<span class='badge-entity'>{r['ent']}</span>"
-            return f"... {r['left']} {kw_html} {follow_html} {pos_html} {ent_html} {r['right']}"
+            return f"<div style='margin-bottom:10px;'>... {r['left']} {kw_html} {follow_html} {r['right']}<br>{pos_html} {ent_html}</div>"
 
         if mode.startswith("Filter") or mode == "Sequential":
-            for r in results:
-                st.markdown(render(r), unsafe_allow_html=True)
+            for idx, r in enumerate(results):
+                with st.expander(f"Match #{idx+1}"):
+                    st.markdown(render(r), unsafe_allow_html=True)
         else:
             for key in sorted_keys:
                 st.markdown(f"#### 🔹 Group: {key}")
-                for r in results:
+                for idx, r in enumerate(results):
                     match = (
                         (mode == "Token Frequency" and r["follow"] == key) or
                         (mode == "POS Frequency" and r["pos"] == key) or
                         (mode == "ENTITY Frequency" and r["ent"] == key)
                     )
                     if match:
-                        st.markdown(render(r), unsafe_allow_html=True)
+                        with st.expander(f"Match #{idx+1}"):
+                            st.markdown(render(r), unsafe_allow_html=True)
