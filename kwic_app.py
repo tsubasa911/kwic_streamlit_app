@@ -28,15 +28,6 @@ st.markdown("""
   margin-left: 4px;
   font-size: 0.75em;
 }
-.fixed-header {
-  position: fixed;
-  top: 0;
-  width: 100%;
-  background-color: #f8f8f8;
-  z-index: 1000;
-  padding: 10px;
-  border-bottom: 1px solid #ccc;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -140,24 +131,22 @@ if st.button("Search"):
 
         def render(r):
             kw_html = f"<span style='color:#ffffff;background:#2a9df4;padding:2px 4px;border-radius:4px;'>{r['keyword']}</span>"
-            follow_html = f"<span style='background:#fff59d;padding:2px 6px;border-radius:6px;font-weight:bold;'>{r['follow']}</span>"
+            follow_html = f"<span style='background:#fff176;color:#000000;padding:2px 6px;border-radius:6px;font-weight:bold;'>{r['follow']}</span>"
             pos_html = f"<span class='badge-pos'>{r['pos']}</span>"
             ent_html = f"<span class='badge-entity'>{r['ent']}</span>"
             return f"<div style='margin-bottom:10px;'>... {r['left']} {kw_html} {follow_html} {r['right']}<br>{pos_html} {ent_html}</div>"
 
         if mode.startswith("Filter") or mode == "Sequential":
-            for idx, r in enumerate(results):
-                with st.expander(f"Match #{idx+1}"):
-                    st.markdown(render(r), unsafe_allow_html=True)
+            for r in results:
+                st.markdown(render(r), unsafe_allow_html=True)
         else:
             for key in sorted_keys:
                 st.markdown(f"#### 🔹 Group: {key}")
-                for idx, r in enumerate(results):
+                for r in results:
                     match = (
                         (mode == "Token Frequency" and r["follow"] == key) or
                         (mode == "POS Frequency" and r["pos"] == key) or
                         (mode == "ENTITY Frequency" and r["ent"] == key)
                     )
                     if match:
-                        with st.expander(f"Match #{idx+1}"):
-                            st.markdown(render(r), unsafe_allow_html=True)
+                        st.markdown(render(r), unsafe_allow_html=True)
