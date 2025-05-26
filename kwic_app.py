@@ -9,29 +9,24 @@ def load_model():
 
 nlp = load_model()
 
-# Inject custom CSS for badges and KWIC alignment
+# Inject CSS with color-coded POS and ENTITY badges
 st.markdown("""
 <style>
-.badge-pos {
-  background-color: #d0d0d0;
-  color: black;
-  border-radius: 6px;
-  padding: 2px 6px;
-  margin-right: 6px;
-  font-size: 0.8em;
-}
-.badge-entity {
-  background-color: #eeeeee;
-  color: black;
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 0.8em;
-}
+.badge-pos-NOUN { background-color: #3498db; color: white; }
+.badge-pos-VERB { background-color: #2ecc71; color: white; }
+.badge-pos-ADJ { background-color: #9b59b6; color: white; }
+.badge-pos-ADV { background-color: #f39c12; color: white; }
+.badge-pos-OTHER { background-color: #95a5a6; color: white; }
+.badge-entity-PERSON { background-color: #e74c3c; color: white; }
+.badge-entity-ORG { background-color: #e67e22; color: white; }
+.badge-entity-GPE { background-color: #1abc9c; color: white; }
+.badge-entity-DATE { background-color: #d35400; color: white; }
+.badge-entity-O { background-color: #bdc3c7; color: white; }
 .kwic-line {
   font-family: monospace;
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   align-items: center;
 }
 .kwic-index {
@@ -71,7 +66,6 @@ st.markdown("""
 }
 .kwic-meta {
   margin-left: 45px;
-  margin-bottom: 18px;
   font-size: 0.85em;
   color: #333;
 }
@@ -88,7 +82,7 @@ with st.expander("📘 使い方ガイドはこちら（初めての方へ）"):
     4. 結果の中から直後の単語とその品詞・固有表現を確認できます
     """)
 
-st.title("KWIC Viewer with POS/ENTITY Highlight")
+st.title("KWIC Viewer with Color-coded POS/ENTITY and Dropdown Filters")
 
 uploaded_file = st.file_uploader("📄 Upload .txt file", type=["txt"])
 raw_text = st.text_area("✍️ Or paste your text here", height=200)
@@ -107,10 +101,12 @@ mode = st.selectbox("📊 Select display mode", [
     "Filter by Token", "Filter by POS", "Filter by Entity"
 ])
 
-filter_value = ""
-if mode.startswith("Filter"):
-    filter_value = st.text_input(f"🔎 Enter value for {mode.split()[-1]}").strip()
+# 事前にユニークな選択肢を格納するためのセット
+pos_options = set()
+ent_options = set()
+token_options = set()
 
+# 検索処理後に表示
 if st.button("Search"):
     if not text or not keyword:
         st.warning("⚠️ Please provide both text and keyword.")
@@ -137,6 +133,10 @@ if st.button("Search"):
                 except IndexError:
                     token_text, pos, ent = "", "", ""
 
+                pos_options.add(pos)
+                ent_options.add(ent)
+                token_options.add(token_text)
+
                 result = {
                     "left": " ".join(left),
                     "keyword": " ".join(keyword_tokens),
@@ -154,7 +154,17 @@ if st.button("Search"):
         MAX_DISPLAY = 200
         results = results[:MAX_DISPLAY]
 
-        if mode == "Token Frequency":
+        # ▼ 修正：フィルター選択肢をプルダウンに変更
+        if mode == "Filter by Token":
+            filter_value = st.selectbox("🔎 Select follow token", sorted(token_options))
+            results = [r for r in results if r["follow"] == filter_value]
+        elif mode == "Filter by POS":
+            filter_value = st.selectbox("🔎 Select POS", sorted(pos_options))
+            results = [r for r in results if r["pos"] == filter_value]
+        elif mode == "Filter by Entity":
+            filter_value = st.selectbox("🔎 Select ENTITY", sorted(ent_options))
+            results = [r for r in results if r["ent"] == filter_value]
+        elif mode == "Token Frequency":
             grouped = Counter([r["follow"] for r in results])
             sorted_keys = [t for t, _ in grouped.most_common()]
         elif mode == "POS Frequency":
@@ -163,16 +173,12 @@ if st.button("Search"):
         elif mode == "ENTITY Frequency":
             grouped = Counter([r["ent"] for r in results])
             sorted_keys = [t for t, _ in grouped.most_common()]
-        elif mode == "Filter by Token":
-            results = [r for r in results if r["follow"] == filter_value]
-        elif mode == "Filter by POS":
-            results = [r for r in results if r["pos"] == filter_value]
-        elif mode == "Filter by Entity":
-            results = [r for r in results if r["ent"] == filter_value]
 
         st.markdown(f"### 🔍 Showing up to {len(results)} match(es)")
 
         def render_aligned(index, r):
+            pos_class = f"badge-pos-{r['pos']}" if r['pos'] in ["NOUN", "VERB", "ADJ", "ADV"] else "badge-pos-OTHER"
+            ent_class = f"badge-entity-{r['ent']}" if r['ent'] in ["PERSON", "ORG", "GPE", "DATE"] else "badge-entity-O"
             return f"""
             <div class='kwic-line'>
                 <div class='kwic-index'>{index+1:>3}</div>
@@ -182,8 +188,8 @@ if st.button("Search"):
                 <div class='kwic-right'>{r['right']}</div>
             </div>
             <div class='kwic-meta'>
-                <span class='badge-pos'>POS: {r['pos']}</span>
-                <span class='badge-entity'>ENTITY: {r['ent']}</span>
+                <span class='{pos_class}'>POS: {r['pos']}</span>
+                <span class='{ent_class}'>ENTITY: {r['ent']}</span>
             </div>
             """
 
@@ -201,3 +207,4 @@ if st.button("Search"):
                     )
                     if match:
                         st.markdown(render_aligned(i, r), unsafe_allow_html=True)
+                        
