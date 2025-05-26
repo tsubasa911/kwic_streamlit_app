@@ -101,12 +101,38 @@ mode = st.selectbox("📊 Select display mode", [
     "Filter by Token", "Filter by POS", "Filter by Entity"
 ])
 
-# 事前にユニークな選択肢を格納するためのセット
-pos_options = set()
-ent_options = set()
-token_options = set()
+# プレフィルターの選択肢（Filter時のみ有効）
+filter_value = ""
+if mode in ["Filter by POS", "Filter by Entity", "Filter by Token"]:
+    with st.spinner("Analyzing for available filter values..."):
+        if text and keyword:
+            doc = nlp(text)
+            tokens = [token.text for token in doc]
+            keyword_tokens = keyword.split()
+            kw_len = len(keyword_tokens)
 
-# 検索処理後に表示
+            follow_tokens = []
+
+            for i in range(len(tokens) - kw_len):
+                if tokens[i:i + kw_len] == keyword_tokens:
+                    try:
+                        follow_token = doc[i + kw_len]
+                        follow_tokens.append(follow_token)
+                    except IndexError:
+                        continue
+
+            pos_set = sorted(set(token.pos_ for token in follow_tokens))
+            ent_set = sorted(set(token.ent_type_ if token.ent_type_ else "O" for token in follow_tokens))
+            word_set = sorted(set(token.text for token in follow_tokens))
+
+            if mode == "Filter by POS":
+                filter_value = st.selectbox("🔎 Select POS", pos_set)
+            elif mode == "Filter by Entity":
+                filter_value = st.selectbox("🔎 Select ENTITY", ent_set)
+            elif mode == "Filter by Token":
+                filter_value = st.selectbox("🔎 Select follow token", word_set)
+
+# 検索ボタンで実行
 if st.button("Search"):
     if not text or not keyword:
         st.warning("⚠️ Please provide both text and keyword.")
@@ -133,10 +159,6 @@ if st.button("Search"):
                 except IndexError:
                     token_text, pos, ent = "", "", ""
 
-                pos_options.add(pos)
-                ent_options.add(ent)
-                token_options.add(token_text)
-
                 result = {
                     "left": " ".join(left),
                     "keyword": " ".join(keyword_tokens),
@@ -154,15 +176,11 @@ if st.button("Search"):
         MAX_DISPLAY = 200
         results = results[:MAX_DISPLAY]
 
-        # ▼ 修正：フィルター選択肢をプルダウンに変更
         if mode == "Filter by Token":
-            filter_value = st.selectbox("🔎 Select follow token", sorted(token_options))
             results = [r for r in results if r["follow"] == filter_value]
         elif mode == "Filter by POS":
-            filter_value = st.selectbox("🔎 Select POS", sorted(pos_options))
             results = [r for r in results if r["pos"] == filter_value]
         elif mode == "Filter by Entity":
-            filter_value = st.selectbox("🔎 Select ENTITY", sorted(ent_options))
             results = [r for r in results if r["ent"] == filter_value]
         elif mode == "Token Frequency":
             grouped = Counter([r["follow"] for r in results])
@@ -207,4 +225,6 @@ if st.button("Search"):
                     )
                     if match:
                         st.markdown(render_aligned(i, r), unsafe_allow_html=True)
-                        
+
+# コメント：
+# - 検索前にフィルター選択肢を選べるよう修正（UIの直感性向上）
