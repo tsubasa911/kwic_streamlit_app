@@ -1,230 +1,124 @@
 import streamlit as st
 import spacy
-from collections import Counter
+import re
+from collections import defaultdict
+from nltk.corpus import wordnet as wn
+import nltk
 
-# Load spaCy model with caching
-@st.cache_resource
-def load_model():
-    return spacy.load("en_core_web_sm")
+# 必要に応じて WordNet を初回ダウンロード
+try:
+    wn.synsets("test")
+except:
+    nltk.download("wordnet")
+    nltk.download("omw-1.4")
 
-nlp = load_model()
+# --- NLPモデル ---
+nlp = spacy.load("en_core_web_sm")
 
-# Inject CSS with color-coded POS and ENTITY badges
-st.markdown("""
-<style>
-.badge-pos-NOUN { background-color: #3498db; color: white; }
-.badge-pos-VERB { background-color: #2ecc71; color: white; }
-.badge-pos-ADJ { background-color: #9b59b6; color: white; }
-.badge-pos-ADV { background-color: #f39c12; color: white; }
-.badge-pos-OTHER { background-color: #95a5a6; color: white; }
-.badge-entity-PERSON { background-color: #e74c3c; color: white; }
-.badge-entity-ORG { background-color: #e67e22; color: white; }
-.badge-entity-GPE { background-color: #1abc9c; color: white; }
-.badge-entity-DATE { background-color: #d35400; color: white; }
-.badge-entity-O { background-color: #bdc3c7; color: white; }
-.kwic-line {
-  font-family: monospace;
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: center;
+# --- 多言語UI ---
+LANGS = {
+    "en": {
+        "title": "KWIC Explorer for English Learners",
+        "input_mode": "Input Mode",
+        "text_input": "Type or paste English text below:",
+        "file_upload": "Or upload a .txt file:",
+        "keyword": "Keyword to search",
+        "context_width": "Context width (number of words)",
+        "pos_filter": "POS Filter",
+        "entity_filter": "Entity Filter",
+        "search": "Search",
+        "no_results": "No matching results found.",
+        "results": "KWIC Results",
+        "dictionary": "📘 Dictionary Definitions (WordNet)"
+    },
+    "ja": {
+        "title": "英語学習者のためのKWIC検索ツール",
+        "input_mode": "入力モード",
+        "text_input": "英語の文章を入力してください：",
+        "file_upload": "または.txtファイルをアップロード：",
+        "keyword": "検索キーワード",
+        "context_width": "前後の単語数",
+        "pos_filter": "品詞フィルター",
+        "entity_filter": "固有表現フィルター",
+        "search": "検索する",
+        "no_results": "該当する例が見つかりませんでした。",
+        "results": "KWIC結果",
+        "dictionary": "📘 語義（WordNetより）"
+    }
 }
-.kwic-index {
-  width: 30px;
-  text-align: right;
-  color: gray;
-}
-.kwic-left {
-  text-align: right;
-  width: 40%;
-  overflow-x: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.kwic-keyword {
-  background-color: #2a9df4;
-  color: #ffffff;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-weight: bold;
-  white-space: nowrap;
-}
-.kwic-follow {
-  background-color: #fff176;
-  color: #000000;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-weight: bold;
-  white-space: nowrap;
-}
-.kwic-right {
-  text-align: left;
-  width: 40%;
-  overflow-x: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.kwic-meta {
-  margin-left: 45px;
-  font-size: 0.85em;
-  color: #333;
-}
-</style>
-""", unsafe_allow_html=True)
 
-# Help Section
-with st.expander("📘 使い方ガイドはこちら（初めての方へ）"):
-    st.markdown("""
-    **KWIC Viewerの使い方：**
-    1. 分析対象のテキストを貼り付ける、または.txtファイルをアップロード
-    2. キーワードを入力（例：artificial intelligence）
-    3. 表示モード（順序・頻度・フィルタ）を選択し、「Search」ボタンを押す
-    4. 結果の中から直後の単語とその品詞・固有表現を確認できます
-    """)
+# --- 言語切替 ---
+lang = st.sidebar.selectbox("Language / 言語", options=["en", "ja"])
+L = LANGS[lang]
 
-st.title("KWIC Viewer with Color-coded POS/ENTITY and Dropdown Filters")
+# --- タイトル表示 ---
+st.title(L["title"])
 
-uploaded_file = st.file_uploader("📄 Upload .txt file", type=["txt"])
-raw_text = st.text_area("✍️ Or paste your text here", height=200)
-
+# --- 入力モード ---
+input_mode = st.radio(L["input_mode"], ["Text", "File"])
 text = ""
-if uploaded_file:
-    text = uploaded_file.read().decode("utf-8")
-elif raw_text.strip():
-    text = raw_text
 
-keyword = st.text_input("🔍 Enter keyword (e.g., artificial intelligence)").strip()
-window_size = st.slider("🔲 Words before and after keyword", 1, 10, 5)
+if input_mode == "Text":
+    text = st.text_area(L["text_input"], height=200)
+else:
+    uploaded_file = st.file_uploader(L["file_upload"], type=["txt"])
+    if uploaded_file is not None:
+        text = uploaded_file.read().decode("utf-8")
 
-mode = st.selectbox("📊 Select display mode", [
-    "Sequential", "Token Frequency", "POS Frequency", "ENTITY Frequency",
-    "Filter by Token", "Filter by POS", "Filter by Entity"
-])
+# --- 検索条件 ---
+keyword = st.text_input(L["keyword"])
+context_width = st.slider(L["context_width"], 1, 10, 5)
+pos_options = ["ALL", "NOUN", "VERB", "ADJ", "ADV"]
+entity_options = ["ALL", "PERSON", "ORG", "GPE", "PRODUCT", "DATE"]
+selected_pos = st.selectbox(L["pos_filter"], pos_options)
+selected_entity = st.selectbox(L["entity_filter"], entity_options)
 
-# プレフィルターの選択肢（Filter時のみ有効）
-filter_value = ""
-if mode in ["Filter by POS", "Filter by Entity", "Filter by Token"]:
-    with st.spinner("Analyzing for available filter values..."):
-        if text and keyword:
-            doc = nlp(text)
-            tokens = [token.text for token in doc]
-            keyword_tokens = keyword.split()
-            kw_len = len(keyword_tokens)
+# --- 検索実行 ---
+if st.button(L["search"]) and keyword and text:
+    doc = nlp(text)
+    tokens = [token for token in doc]
+    results = []
 
-            follow_tokens = []
+    for i, token in enumerate(tokens):
+        if token.text.lower() == keyword.lower():
+            left = " ".join(t.text for t in tokens[max(0, i - context_width):i])
+            center = token.text
+            right = " ".join(t.text for t in tokens[i + 1:i + 1 + context_width])
 
-            for i in range(len(tokens) - kw_len):
-                if tokens[i:i + kw_len] == keyword_tokens:
-                    try:
-                        follow_token = doc[i + kw_len]
-                        follow_tokens.append(follow_token)
-                    except IndexError:
-                        continue
+            # POS & ENTITYフィルタ
+            if selected_pos != "ALL" and token.pos_ != selected_pos:
+                continue
+            if selected_entity != "ALL":
+                ent = token.ent_type_ if token.ent_type_ else "O"
+                if ent != selected_entity:
+                    continue
 
-            pos_set = sorted(set(token.pos_ for token in follow_tokens))
-            ent_set = sorted(set(token.ent_type_ if token.ent_type_ else "O" for token in follow_tokens))
-            word_set = sorted(set(token.text for token in follow_tokens))
+            results.append((left, center, right, token.pos_, token.ent_type_))
 
-            if mode == "Filter by POS":
-                filter_value = st.selectbox("🔎 Select POS", pos_set)
-            elif mode == "Filter by Entity":
-                filter_value = st.selectbox("🔎 Select ENTITY", ent_set)
-            elif mode == "Filter by Token":
-                filter_value = st.selectbox("🔎 Select follow token", word_set)
+    # --- KWIC結果表示 ---
+    if results:
+        st.subheader(L["results"])
+        for left, center, right, pos, ent in results:
+            st.markdown(
+                f"... {left} **{center}** {right} ...  \n"
+                f"*POS:* `{pos}`  |  *ENTITY:* `{ent if ent else 'None'}`"
+            )
+    else:
+        st.warning(L["no_results"])
 
-# 検索ボタンで実行
-if st.button("Search"):
-    if not text or not keyword:
-        st.warning("⚠️ Please provide both text and keyword.")
-        st.stop()
-
-    with st.spinner("Processing..."):
-        doc = nlp(text)
-        tokens = [token.text for token in doc]
-        keyword_tokens = keyword.split()
-        kw_len = len(keyword_tokens)
-
-        results = []
-
-        for i in range(len(tokens) - kw_len):
-            if tokens[i:i + kw_len] == keyword_tokens:
-                left = tokens[max(0, i - window_size):i]
-                right = tokens[i + kw_len:i + kw_len + window_size]
-
-                try:
-                    follow_token = doc[i + kw_len]
-                    token_text = follow_token.text
-                    pos = follow_token.pos_
-                    ent = follow_token.ent_type_ if follow_token.ent_type_ else "O"
-                except IndexError:
-                    token_text, pos, ent = "", "", ""
-
-                result = {
-                    "left": " ".join(left),
-                    "keyword": " ".join(keyword_tokens),
-                    "follow": token_text,
-                    "right": " ".join(right),
-                    "pos": pos,
-                    "ent": ent
-                }
-                results.append(result)
-
-        if not results:
-            st.info("No matches found.")
-            st.stop()
-
-        MAX_DISPLAY = 200
-        results = results[:MAX_DISPLAY]
-
-        if mode == "Filter by Token":
-            results = [r for r in results if r["follow"] == filter_value]
-        elif mode == "Filter by POS":
-            results = [r for r in results if r["pos"] == filter_value]
-        elif mode == "Filter by Entity":
-            results = [r for r in results if r["ent"] == filter_value]
-        elif mode == "Token Frequency":
-            grouped = Counter([r["follow"] for r in results])
-            sorted_keys = [t for t, _ in grouped.most_common()]
-        elif mode == "POS Frequency":
-            grouped = Counter([r["pos"] for r in results])
-            sorted_keys = [t for t, _ in grouped.most_common()]
-        elif mode == "ENTITY Frequency":
-            grouped = Counter([r["ent"] for r in results])
-            sorted_keys = [t for t, _ in grouped.most_common()]
-
-        st.markdown(f"### 🔍 Showing up to {len(results)} match(es)")
-
-        def render_aligned(index, r):
-            pos_class = f"badge-pos-{r['pos']}" if r['pos'] in ["NOUN", "VERB", "ADJ", "ADV"] else "badge-pos-OTHER"
-            ent_class = f"badge-entity-{r['ent']}" if r['ent'] in ["PERSON", "ORG", "GPE", "DATE"] else "badge-entity-O"
-            return f"""
-            <div class='kwic-line'>
-                <div class='kwic-index'>{index+1:>3}</div>
-                <div class='kwic-left'>{r['left']}</div>
-                <div class='kwic-keyword'>{r['keyword']}</div>
-                <div class='kwic-follow'>{r['follow']}</div>
-                <div class='kwic-right'>{r['right']}</div>
-            </div>
-            <div class='kwic-meta'>
-                <span class='{pos_class}'>POS: {r['pos']}</span>
-                <span class='{ent_class}'>ENTITY: {r['ent']}</span>
-            </div>
-            """
-
-        if mode.startswith("Filter") or mode == "Sequential":
-            for i, r in enumerate(results):
-                st.markdown(render_aligned(i, r), unsafe_allow_html=True)
+    # --- WordNet辞書表示 ---
+    if keyword:
+        st.subheader(L["dictionary"])
+        synsets = wn.synsets(keyword)
+        if synsets:
+            for i, syn in enumerate(synsets[:5]):
+                st.markdown(f"**{i+1}. {syn.name()}**")
+                st.write(f"- Definition: {syn.definition()}")
+                if syn.examples():
+                    st.write(f"- Example: _{syn.examples()[0]}_")
+                if syn.lemmas():
+                    synonyms = set(lemma.name() for lemma in syn.lemmas())
+                    st.write(f"- Synonyms: {', '.join(synonyms)}")
+                st.markdown("---")
         else:
-            for key in sorted_keys:
-                st.markdown(f"#### 🔹 Group: {key}")
-                for i, r in enumerate(results):
-                    match = (
-                        (mode == "Token Frequency" and r["follow"] == key) or
-                        (mode == "POS Frequency" and r["pos"] == key) or
-                        (mode == "ENTITY Frequency" and r["ent"] == key)
-                    )
-                    if match:
-                        st.markdown(render_aligned(i, r), unsafe_allow_html=True)
-
-# コメント：
-# - 検索前にフィルター選択肢を選べるよう修正（UIの直感性向上）
+            st.info("No definitions found in WordNet.")
