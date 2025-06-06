@@ -5,17 +5,17 @@ from collections import defaultdict
 from nltk.corpus import wordnet as wn
 import nltk
 
-# 必要に応じて WordNet を初回ダウンロード
+# WordNet初期化（初回のみ）
 try:
     wn.synsets("test")
 except:
     nltk.download("wordnet")
     nltk.download("omw-1.4")
 
-# --- NLPモデル ---
+# NLPモデル読み込み
 nlp = spacy.load("en_core_web_sm")
 
-# --- 多言語UI ---
+# --- 多言語対応 ---
 LANGS = {
     "en": {
         "title": "KWIC Explorer for English Learners",
@@ -47,7 +47,7 @@ LANGS = {
     }
 }
 
-# --- 言語切替 ---
+# --- 言語設定 ---
 lang = st.sidebar.selectbox("Language / 言語", options=["en", "ja"])
 L = LANGS[lang]
 
@@ -81,32 +81,52 @@ if st.button(L["search"]) and keyword and text:
 
     for i, token in enumerate(tokens):
         if token.text.lower() == keyword.lower():
-            left = " ".join(t.text for t in tokens[max(0, i - context_width):i])
-            center = token.text
-            right = " ".join(t.text for t in tokens[i + 1:i + 1 + context_width])
+            left = tokens[max(0, i - context_width):i]
+            center = token
+            right = tokens[i + 1:i + 1 + context_width]
 
-            # POS & ENTITYフィルタ
+            # フィルタ適用
             if selected_pos != "ALL" and token.pos_ != selected_pos:
                 continue
-            if selected_entity != "ALL":
-                ent = token.ent_type_ if token.ent_type_ else "O"
-                if ent != selected_entity:
-                    continue
+            ent = token.ent_type_ if token.ent_type_ else "None"
+            if selected_entity != "ALL" and ent != selected_entity:
+                continue
 
-            results.append((left, center, right, token.pos_, token.ent_type_))
+            results.append((left, center, right, token.pos_, ent))
 
-    # --- KWIC結果表示 ---
     if results:
         st.subheader(L["results"])
-        for left, center, right, pos, ent in results:
+        for idx, (left, center, right, pos, ent) in enumerate(results, 1):
+            # 強調表示処理
+            right_str = ""
+            if right:
+                next_token = right[0]
+                highlighted_next = (
+                    f"<span style='background-color:#fff176; color:#000; font-weight:bold; padding:2px; border-radius:4px;'>"
+                    f"{next_token.text}</span>"
+                )
+                right_rest = " ".join(t.text for t in right[1:])
+                right_str = f"{highlighted_next} {right_rest}"
+
+            left_str = " ".join(t.text for t in left)
+            center_str = (
+                f"<span style='background-color:#64b5f6; font-weight:bold; padding:2px; border-radius:4px;'>"
+                f"{center.text}</span>"
+            )
+
+            # レスポンシブ対応 + インデックス強調
             st.markdown(
-                f"... {left} **{center}** {right} ...  \n"
-                f"*POS:* `{pos}`  |  *ENTITY:* `{ent if ent else 'None'}`"
+                f"<div style='font-size: 1rem; word-wrap: break-word;'>"
+                f"<span style='font-size: 1.25rem; font-weight: bold; margin-right: 8px;'>{idx}.</span>"
+                f"... {left_str} {center_str} {right_str} ..."
+                f"</div>"
+                f"<div style='font-size: 0.85rem; color: gray;'>POS: <code>{pos}</code> &nbsp;|&nbsp; ENTITY: <code>{ent}</code></div><hr>",
+                unsafe_allow_html=True
             )
     else:
         st.warning(L["no_results"])
 
-    # --- WordNet辞書表示 ---
+    # --- WordNet定義表示 ---
     if keyword:
         st.subheader(L["dictionary"])
         synsets = wn.synsets(keyword)
